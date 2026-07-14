@@ -747,6 +747,32 @@ def get_usage(user=Depends(get_current_user)):
     return {"used_today": used, "limit": limit, "remaining": max(0, limit - used), "plan": plan}
 
 
+@app.get("/api/admin/users")
+def get_all_users(secret: str = ""):
+    if not secret or secret != "admin-dashboard-secret-991":
+        raise HTTPException(401, "Invalid or missing secret query parameter")
+    conn = get_db()
+    users = conn.execute("SELECT id, email, created_at FROM users").fetchall()
+    notes_count = conn.execute("SELECT user_id, COUNT(id) as count FROM meeting_notes GROUP BY user_id").fetchall()
+    subs = conn.execute("SELECT user_id, plan_tier, status FROM subscriptions").fetchall()
+    conn.close()
+    
+    notes_map = {r["user_id"]: r["count"] for r in notes_count}
+    subs_map = {r["user_id"]: {"plan": r["plan_tier"], "status": r["status"]} for r in subs}
+    
+    result = []
+    for u in users:
+        uid = u["id"]
+        result.append({
+            "id": uid,
+            "email": u["email"],
+            "created_at": u["created_at"],
+            "notes_count": notes_map.get(uid, 0),
+            "subscription": subs_map.get(uid, {"plan": "free", "status": "active"})
+        })
+    return result
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "groq_configured": bool(GROQ_API_KEY), "stripe_configured": bool(STRIPE_SECRET_KEY)}
