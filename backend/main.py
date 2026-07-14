@@ -362,11 +362,12 @@ async def stripe_webhook(request: Request):
 
     if etype == "checkout.session.completed":
         s = event["data"]["object"]
-        metadata = s.get("metadata") or {}
+        s_dict = s.to_dict() if hasattr(s, "to_dict") else dict(s)
+        metadata = s_dict.get("metadata") or {}
         user_id  = int(metadata.get("user_id", 0))
         plan     = metadata.get("plan", "pro")
-        cust_id  = s.get("customer")
-        sub_id   = s.get("subscription")
+        cust_id  = s_dict.get("customer")
+        sub_id   = s_dict.get("subscription")
         period_end = None
         if sub_id:
             try:
