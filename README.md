@@ -1,48 +1,119 @@
-3# AI Meeting Notes
+# Notelift — AI-Powered Meeting Intelligence
 
-Implements the full architecture: input validation → normalization → hash
-dedup → usage/plan gate → chunk decision → prompt builder → Groq LLM call →
-validation/retry/fallback → SQLite storage → dashboard.
+Notelift is a premium SaaS application that transforms raw, messy meeting transcripts into clean, highly structured, and actionable meeting notes. Powered by the Llama 3.3 70B model via Groq, Notelift automates the tedious post-meeting documentation process—extracting summaries, action items with assignees, key decisions, risks, technical terms, and more.
 
-## Backend (FastAPI + Groq)
+It features a full authentication flow, automated history logging, inline nested editing of all sections, PDF exports, and a test-mode Stripe subscription billing portal.
 
-```bash
-cd backend
-pip install -r requirements.txt
-cp .env.example .env      # then add your real OPENAI_API_KEY
-export OPENAI_API_KEY=your_key_here
-uvicorn main:app --reload --port 8000
+---
+
+## 🚀 Key Features
+
+* **AI Summarization Pipeline:** Multi-stage summarization with prompt-injection defense and a rolling context merger for long transcripts.
+* **Granular Editing & Customization:** Modify, add, or delete items within any section (Action Items, Decisions, Risks, Open Questions, Topics, References, Technical Concepts, and custom Additional Notes) before or after saving.
+* **Auto-Saving organizational Memory:** Generated notes are saved automatically to your dashboard and are fully searchable.
+* **Stripe Test Billing Portal:** A functional subscription flow with Starter (Free), Pro, and Team plan tiers with gated usage limits (3, 100, and 1,000 summaries/day respectively) and real-time backend webhook state management.
+* **High-Fidelity PDF Export:** Generate and download clean, styled meeting report PDFs instantly.
+* **Comprehensive Docs & Support:** Built-in FAQ guide, system operational status indicators, and customer support ticket submission forms.
+
+---
+
+## 🛠️ Technology Stack
+
+### Backend
+* **FastAPI:** High-performance web framework.
+* **SQLite:** Reliable local relational database with custom thread-safe connection pooling.
+* **Groq API:** Blazing-fast inference using the **Llama 3.3 70B** model.
+* **Bcrypt:** Password hashing.
+* **Stripe SDK:** Subscription management and secure webhook verification.
+
+### Frontend
+* **React (Vite):** Fast single-page application build setup.
+* **Tailwind CSS:** Modern, responsive styling.
+* **Lucide React:** Icon library.
+* **jsPDF:** Client-side PDF generation.
+
+---
+
+## 📁 Repository Structure
+
+```text
+one day Assesment/
+├── backend/            # FastAPI python server code
+│   ├── main.py         # Main entry point, routes, database init, Stripe webhooks
+│   ├── requirements.txt# Backend dependencies
+│   ├── Procfile        # Railway deployment configuration
+│   └── .env.example    # Template for local environment configuration
+├── frontend/           # React frontend single-page app
+│   ├── src/            # Components, pages, assets, router hooks
+│   │   ├── App.jsx     # Main React routes, AuthContext, Page views
+│   │   └── index.css   # Tailored theme css styles
+│   ├── vercel.json     # SPA routing rewrite rules for Vercel hosting
+│   └── package.json    # Frontend dependencies
+├── .gitignore          # Repository git-ignore configuration (ignores secrets/databases)
+└── README.md           # Project documentation
 ```
 
-API docs (Swagger UI) will be at `http://localhost:8000/docs`.
+---
 
-### Endpoints
-- `POST /api/summarize` — body `{ "transcript": "..." }`, header `x-user-id: <user id>`
-- `GET /api/notes` — history for a user, header `x-user-id: <user id>`
-- `GET /api/usage` — today's usage vs free-tier limit, header `x-user-id: <user id>`
-- `GET /health` — health check
+## 💻 Local Development Setup
 
-## Frontend
+### 1. Backend Setup
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+2. Create a virtual environment and activate it:
+   ```bash
+   python -m venv venv
+   # On Windows:
+   .\venv\Scripts\activate
+   # On macOS/Linux:
+   source venv/bin/activate
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Copy the environment template and add your credentials:
+   ```bash
+   cp .env.example .env
+   ```
+5. Run the FastAPI development server:
+   ```bash
+   uvicorn main:app --reload --port 8000
+   ```
 
-Plain HTML/JS, no build step needed. Just open `frontend/index.html` in a
-browser while the backend is running on `localhost:8000`.
+### 2. Frontend Setup
+1. Navigate to the frontend directory:
+   ```bash
+   cd ../frontend
+   ```
+2. Install npm dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the Vite development server:
+   ```bash
+   npm run dev
+   ```
+4. Open your browser and navigate to `http://localhost:5173`.
 
-(It's hardcoded to `USER_ID = "demo-user-1"` for the demo — wire this to your
-real auth/session in production.)
+---
 
-## Notes on OpenAI model
+## 🌐 Production Deployment
 
-Default model is `gpt-4o-mini`. You can swap via the `OPENAI_MODEL`
-env var to any OpenAI-hosted model, e.g. `gpt-4o` for higher quality
-responses if cost/latency allow.
+### Backend (Railway)
+* Set **Root Directory** to `backend`.
+* Add environment variables (`GROQ_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_PRO_PRICE_ID`, `STRIPE_TEAM_PRICE_ID`, `FRONTEND_URL`).
+* Deploy and generate your public backend URL.
 
-## What's implemented vs. simplified for the 24hr scope
+### Frontend (Vercel)
+* Set **Root Directory** to `frontend`.
+* Add environment variable `VITE_API_BASE` pointing to your Railway backend URL (make sure it starts with `https://` and has no trailing `/`).
+* Deploy.
 
-- **Implemented**: full 9-stage pipeline, atomic usage gating (race-free),
-  content-hash dedup, chunking with rolling context + merge for long
-  transcripts, retry-then-fallback on malformed LLM output, prompt-injection
-  defense (transcript treated as data, not instructions).
-- **Simplified for demo**: no real auth (`x-user-id` header stands in for a
-  session), no Stripe integration wired in yet (usage gate is ready to hook
-  into a `plan_tier` check once Stripe is added), SQLite instead of Postgres
-  (swap easily via SQLAlchemy if needed).
+### Stripe Webhook Configuration
+* Go to Stripe Dashboard -> Webhooks -> Add Endpoint.
+* Set URL to: `https://your-railway-domain.up.railway.app/api/stripe/webhook`
+* Select events: `checkout.session.completed`, `invoice.paid`, `customer.subscription.updated`, and `customer.subscription.deleted`.
+* Copy the signing secret (`whsec_...`) and add it to your Railway config variables as `STRIPE_WEBHOOK_SECRET`.
